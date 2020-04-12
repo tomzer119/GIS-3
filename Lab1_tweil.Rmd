@@ -1,0 +1,88 @@
+---
+title: "R Notebook"
+output:
+  html_document:
+    df_print: paged
+    
+---
+
+ <font size="7"> Lab 1- Thomas Weil</font> 
+
+<h1> In this Lab I will
+
+<h3>1.Learn to use Rmarkdown
+
+
+<h3>2.Review R mechanics
+
+
+<h3>3.Review vector and raster data
+
+
+&nbsp;
+
+
+
+
+
+ <font size="4"> Load in Libraries and Check Version</font> 
+
+```{r}
+version
+library(sf)          # classes and functions for vector data
+library(raster) 
+library(spData)        # load geographic data
+library(spDataLarge)
+library(devtools)
+library(rasterVis)
+devtools::install_github("Nowosad/spDataLarge")
+
+```
+
+
+&nbsp;
+
+  <font size="4"> Create SP and SF version of World Data frame</font> 
+```{r}
+library(sp)
+world_sp = as(world, Class = "Spatial")
+world_sf = st_as_sf(world_sp)
+```
+
+
+
+&nbsp;
+
+  <font size="4"> Create plot of asia boundaries by making a union of all the different maps of asia</font> 
+```{r}
+world_asia = world[world$continent == "Asia", ]
+asia = st_union(world_asia)
+asia
+```
+&nbsp;
+
+
+
+  <font size="4"> Create a plot of the world with circles demarkating population</font>
+```{r}
+plot(world["continent"], reset = FALSE)
+cex = sqrt(world$pop) / 10000
+world_cents = st_centroid(world, of_largest = TRUE)
+plot(st_geometry(world_cents), add = TRUE, cex = cex)
+
+```
+
+
+&nbsp;
+
+  <font size="4"> Create and plot new raster</font>
+```{r}
+
+new_raster2 = raster(nrows = 6, ncols = 6, res = 0.5, 
+                     xmn = -1.5, xmx = 1.5, ymn = -1.5, ymx = 1.5,
+                     vals = 1:36)
+plot(new_raster2)
+
+
+
+```
