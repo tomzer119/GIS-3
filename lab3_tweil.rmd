@@ -1,0 +1,65 @@
+---
+title: "Lab 3"
+author: "GIS 3- Thomas Weil"
+output:
+  html_document:
+    theme: cosmo
+    toc: yes
+    df_print: paged
+    
+  
+---
+
+#Load in Libraries
+```{r}
+library(sf)
+library(sf)
+library(raster)
+library(dplyr)
+library(stringr) 
+library(tidyr) 
+library(spData)
+library(spDataLarge)
+library(rmapshaper)
+library(tmap)
+
+```
+
+
+
+
+
+#Read in data 
+```{r}
+ pa<- read.csv("https://data.pa.gov/api/views/azzc-q64m/rows.csv?accessType=DOWNLOAD")
+ class(pa)
+
+ setwd("/Users/thomasweil/Desktop/YEAR2/ZOOM university/GIS 3/lab 3")
+ #download.file(url, destfile, method = "auto", quiet=FALSE)
+
+ download.file("https://data.pa.gov/api/geospatial/xq2b-bzbq?method=export&format=Shapefile", "dataset2.zip")
+ unzip ("dataset2.zip", exdir = "./")
+ setwd("/Users/thomasweil/Desktop/YEAR2/ZOOM university/GIS 3/lab 3/dataset2")
+ county<-st_read("geo_export_bdc05895-252e-4afa-a11e-df6ae7aef11d.shp")
+ 
+```
+ 
+#Manipulate data
+```{r}
+#filter to yuear 2018
+pa2<- filter(pa, Year == 2018)
+#filter out summary row
+pa2 <- filter( pa2, County != "Pennsylvania")
+#merge overdose to map of PA
+total <- merge(county, pa2, by.y="County.Code.Number", by.x= "county_cod", all.x=TRUE, all.y=FALSE)
+
+```
+
+#Tmap
+```{r}
+#set style to albartorss
+tmap_style("albatross")
+
+#use Tmap to make a map
+tm_shape(total)+tm_fill("Count", palette="Reds",title= "Death Count", breaks= c(0,1,10,25,45,75,125,150,200,250,1000,1500))+ tm_layout(bg.color="skyblue", legend.outside = TRUE ,legend.outside.position="right", legend.text.color="black", main.title = "Heroin Overdose- PA 2018", compass.type="rose")+tm_compass(position= c("right", "top"), color.dark="green", color.light="pink", text.color= "red", size=2)+  tm_text("county_nam", remove.overlap = FALSE,size=11/40)+tm_credits("OpendataPA, https://data.pa.gov/Opioid-Related/Estimated-Accidental-and-Undetermined-Drug-Overdos/azzc-q64m", col="black")
+```
