@@ -1,0 +1,252 @@
+---
+title: "Lab 2"
+author: "Thomas Weil GIS 3"
+output:
+  html_document:
+    theme: cosmo
+    toc: true
+    df_print: paged
+  pdf_document: default
+---
+
+In this lab we will be constructing a clustered index, to show areas that are similar in terms of several demographic, housing and socio-economic variables. This will allow us to see the degree to wich certain areas in the city are like other areas. 
+
+## Load in Data
+
+Create a data frame of Numerators and Denomenators
+```{r}
+setwd("/Users/thomasweil/Desktop/YEAR2/ZOOM university/GIS 3/lab 6")
+load("census_2011_UK_OA.RData")
+Census_2011_Count <- merge(Liverpool,Census_2011_Count_All,by="OA",all.x=TRUE)
+head(OAC_Input_Lookup[,])
+#(We will now write some code that will calculate all of the numerators:
+
+
+
+OAC_Input <- as.data.frame(Census_2011_Count$OA)
+colnames(OAC_Input) <- "OA"
+
+
+#For loop in order to create the correct variables
+
+for (n in 1:nrow(OAC_Input_Lookup)){
+      # Get the variables to aggregate for the row specified by n
+      select_vars <- OAC_Input_Lookup[n,"England_Wales"]
+      
+      # Create a list of the variables to select
+      select_vars <- unlist(strsplit(paste(select_vars),","))
+      
+      # Create variable name
+      vname <- OAC_Input_Lookup[n,"VariableCode"] 
+      
+      # Creates a sum of the census variables for each Output Area
+      tmp <- data.frame(rowSums(Census_2011_Count[,select_vars, drop=FALSE]))
+      colnames(tmp) <- vname
+      
+      # Append new variable to the OAC_Input object
+      OAC_Input <- cbind(OAC_Input,tmp)
+      
+      # Remove temporary objects
+      remove(list = c("vname","tmp"))
+} 
+OAC_Input$k035 <- NULL
+
+
+OAC_Input_den <- as.data.frame(Census_2011_Count$OA)
+colnames(OAC_Input_den) <- "OA"
+
+
+den_list <- unique(OAC_Input_Lookup[,"Denominator"])
+den_list <- paste(den_list[den_list != ""])
+# Select denominators
+OAC_Input_den <- Census_2011_Count[,c("OA",den_list)]
+
+OAC_Input <- merge(OAC_Input,OAC_Input_den, by="OA")
+```
+
+## More Data Frame Manipulation
+Create numerator denominator list
+
+```{r}
+
+K_Var <- OAC_Input_Lookup[OAC_Input_Lookup$Type == "Count",c(1,3)]
+
+head(K_Var)
+```
+
+##Run a loop to compare numerator and denomentaor and create percentages
+
+```{r}
+# Create an OA list / data frame
+OAC_Input_PCT_RATIO <- subset(OAC_Input, select = "OA")
+# Loop
+for (n in 1:nrow(K_Var)){
+  
+  num <- paste(K_Var[n,"VariableCode"]) # Get numerator name
+  den <- paste(K_Var[n,"Denominator"]) # Get denominator name
+  tmp <- data.frame(OAC_Input[,num] / OAC_Input[,den] * 100) # Calculate percentages
+  colnames(tmp) <- num
+  OAC_Input_PCT_RATIO <- cbind(OAC_Input_PCT_RATIO,tmp) # Append the percentages
+  
+  # Remove temporary objects
+  remove(list = c("tmp","num","den"))
+}
+```
+
+
+```{r}
+# Create an OA list / data frame
+OAC_Input_PCT_RATIO <- subset(OAC_Input, select = "OA")
+# Loop
+for (n in 1:nrow(K_Var)){
+  
+  num <- paste(K_Var[n,"VariableCode"]) # Get numerator name
+  den <- paste(K_Var[n,"Denominator"]) # Get denominator name
+  tmp <- data.frame(OAC_Input[,num] / OAC_Input[,den] * 100) # Calculate percentages
+  colnames(tmp) <- num
+  OAC_Input_PCT_RATIO <- cbind(OAC_Input_PCT_RATIO,tmp) # Append the percentages
+  
+  # Remove temporary objects
+  remove(list = c("tmp","num","den"))
+}
+```
+
+## Load in census table, merge to find density
+Use merge function
+
+```{r}
+#Extract Variable
+tmp <- Census_2011_Count[,c("OA","KS101EW0008")]
+colnames(tmp) <- c("OA","k007")
+#Merge
+OAC_Input_PCT_RATIO <- merge(OAC_Input_PCT_RATIO,tmp,by="OA")
+```
+
+## Calaculate Standardized Illness Rate
+
+
+```{r}
+# Calculate rates of ill people 15 or less and greater than or equal to 65
+ill_16_64 <- rowSums(Census_2011_Count[,c("KS301EW0005","KS301EW0006")]) # Ill people 16-64
+ill_total <-   rowSums(Census_2011_Count[,c("KS301EW0002","KS301EW0003")]) # All ill people
+ill_L15_G65 <- ill_total - ill_16_64 # Ill people 15 or less and greater than or equal to 65
+# Calculate total people 15 or less and greater than or equal to 65
+t_pop_16_64 <- rowSums(Census_2011_Count[,c("KS102EW0007","KS102EW0008","KS102EW0009","KS102EW0010","KS102EW0011","KS102EW0012","KS102EW0013")]) # People 16-64
+t_pop <- Census_2011_Count$KS101EW0001 # All people
+t_pop_L15_G65 <- t_pop - t_pop_16_64 # All people 15 or less and greater than or equal to 65
+# Calculate expected rate
+ex_ill_16_64 <- t_pop_16_64 * (sum(ill_16_64)/sum(t_pop_16_64)) # Expected ill 16-64
+ex_ill_L15_G65 <- t_pop_L15_G65 * (sum(ill_L15_G65)/sum(t_pop_L15_G65)) # Expected ill people 15 or less and greater than or equal to 65
+ex_ill <- ex_ill_16_64 + ex_ill_L15_G65 # total expected ill people
+# Ratio
+SIR <- as.data.frame(ill_total / ex_ill * 100) # ratio between ill people and expected ill people
+colnames(SIR) <- "k035"
+# Merge data
+OAC_Input_PCT_RATIO <- cbind(OAC_Input_PCT_RATIO,SIR)
+# Remove unwanted objects
+remove(list=c("SIR","ill_16_64","ill_total","ill_L15_G65","t_pop_16_64","t_pop","t_pop_L15_G65","ex_ill_16_64","ex_ill_L15_G65","ex_ill"))
+OAC_Input_PCT_RATIO 
+```
+
+
+
+```{r}
+# Calculate inverse hyperbolic sine
+OAC_Input_PCT_RATIO_IHS <- log(OAC_Input_PCT_RATIO[,2:61]+sqrt(OAC_Input_PCT_RATIO[,2:61]^2+1))
+# Calculate Range
+range_01 <- function(x){(x-min(x))/(max(x)-min(x))} # range function
+OAC_Input_PCT_RATIO_IHS_01 <- apply(OAC_Input_PCT_RATIO_IHS, 2, range_01) # apply range function to columns
+# Add the OA codes back onto the data frame as row names
+rownames(OAC_Input_PCT_RATIO_IHS_01) <- OAC_Input_PCT_RATIO$OA
+```
+
+## Estimating the optimal number of clusters
+
+Use sum of squares technique to calculate optimal number of clusters
+
+```{r}
+library(ggplot2)
+# Create a new empty numeric object to store the wss results
+wss <- numeric()
+# Run k means for 2-12 clusters and store the wss results
+for (i in 2:12) wss[i] <- sum(kmeans(OAC_Input_PCT_RATIO_IHS_01, centers=i,nstart=20)$withinss)
+# Create a data frame with the results, adding a further column for the cluster number
+wss <- data.frame(2:12,wss[-1])
+# Plot the results
+names(wss) <- c("k","Twss")
+ggplot(data=wss, aes(x= k, y=Twss)) + geom_path() + geom_point() + scale_x_continuous(breaks=2:12) + labs(y = "Total within sum of squares")
+```
+
+We will chose 7 clusters
+
+## Building the geodemographic
+
+No need to run this, it simple creates optomized clusters. 
+
+```{r eval= FALSE}
+cluster_7 <- kmeans(x=OAC_Input_PCT_RATIO_IHS_01, centers=7, iter.max=1000000, nstart=10000)
+OAC_Input_PCT_RATIO_IHS_01
+```
+
+## Load in the clusters premade from another data set
+
+```{r}
+setwd("/Users/thomasweil/Desktop/YEAR2/ZOOM university/GIS 3/lab 6")
+# Load cluster object
+load("cluster_7.Rdata")
+```
+
+
+
+
+
+
+## Examine Clusters
+
+```{r}
+# Lookup Table
+lookup <- data.frame(cluster_7$cluster)
+# Add OA codes
+lookup$OA <- rownames(lookup)
+colnames(lookup) <- c("K_7","OA")
+# Recode clusters as letter
+lookup$SUPER <- LETTERS[lookup$K_7]
+```
+
+We will also look at the distribution of these clusters:
+
+```{r}
+table(lookup$K_7)
+```
+
+## Map The Clusters 
+
+Use tmap
+```{r}
+# Load packages
+library(rgdal)
+library(tmap)
+# Import OA boundaries
+liverpool_SP <- readOGR("Liverpool_OA_2011.geojson", "OGRGeoJSON")
+# Merge lookup
+
+plot(liverpool_SP)
+liverpool_SP@data
+
+liverpool_SP <- merge(liverpool_SP, lookup, by.x="oa_code",by.y="OA")
+
+tmap_mode("plot")
+tmap_style("beaver")
+m <- tm_shape(liverpool_SP, projection=27700) +
+    tm_polygons(col="SUPER", border.col = "grey50",   palette="Set2",border.alpha = .3, title="Cluster", showNA=FALSE) +
+  tm_layout(legend.outside=TRUE,legend.position = c("left", "bottom"), frame = FALSE, main.title= "Liverpool Cluster Analysis", bg.color="white")+tm_compass(position= c("right", "top"), color.dark="green", color.light="pink", text.color= "red", size=2)+tm_credits("urban_analytics/10_Data_Reduction_Geodemographics/P10_Data_Reduction_Geodmeographics.Rmd
+")+tm_basemap("Stamen.Watercolor")
+
+m
+
+
+#Create leaflet plot
+
+```
+
+This map, showing the areas that belong to each data cluster, shows some clear spatial clustering as well. The downtown area has many areas in the G category, then there seem to be a few rings, descending down to f, e, C, and then the rest. The d tend to be farther out. There is an interesting cluster of the E cluster around the F and and G but out near the water. This is porbbably due to specific enviormental conditions/job oppurtunities specific to those groups of people (fishing?). These are my current take aways from the map. 
